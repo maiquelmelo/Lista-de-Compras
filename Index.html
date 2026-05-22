@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lista de Compras</title>
+<style>
+:root{--primary:#006b4f;--primary2:#009b72;--bg:#f4f7f6;--card:#fff;--text:#1d2939;--muted:#667085;--border:#d0d5dd;--danger:#b42318;--warning:#b54708}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text)}
+main{max-width:1180px;margin:22px auto;padding:0 14px}.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 8px 24px rgba(16,24,40,.06)}
+.card h2{font-size:18px;margin:0 0 14px}.toolbar{display:grid;grid-template-columns:1fr 180px;gap:10px;margin-bottom:14px}input,select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;background:white}label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}.form-grid{display:grid;grid-template-columns:1.5fr .7fr .8fr auto;gap:10px;align-items:end;margin-top:10px}
+button{border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer;background:var(--primary);color:white}button:hover{filter:brightness(.96)}.btn-light{background:#e7f5f0;color:var(--primary)}.btn-danger{background:#fee4e2;color:var(--danger)}.btn-warning{background:#fff4e5;color:var(--warning)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.item-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;max-height:620px;overflow:auto;padding-right:4px}.item{border:1px solid var(--border);border-radius:12px;padding:12px;background:#fff;display:grid;gap:8px}.item.selected{border-color:#86efac;background:#f0fdf8}.item-top{display:flex;gap:8px;align-items:flex-start}.item input[type=checkbox]{width:18px;height:18px;margin-top:2px}.item-title{font-weight:700;font-size:14px;line-height:1.25}.item small{color:var(--muted)}.qty-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.qty-row input{padding:8px}.mini{font-size:12px;padding:8px 10px}.edit-grid{display:grid;grid-template-columns:1fr;gap:7px;margin-top:4px}.edit-actions{display:flex;gap:7px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border-bottom:1px solid var(--border);padding:10px;text-align:left;font-size:14px}th{background:#f9fafb;color:#344054}.empty{text-align:center;color:var(--muted);padding:26px}.status{margin-top:10px;color:var(--muted);font-size:13px}.hide-print{display:block}.print-title{display:none}.nf-box{margin-top:14px;border:1px solid var(--border);border-radius:12px;padding:12px;background:#f9fafb;font-size:13px;line-height:1.45}.delivery-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}.section-title{font-size:14px;font-weight:700;margin:14px 0 8px;color:#344054}.print-info{margin-bottom:14px}.print-info p{margin:4px 0;font-size:13px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.toolbar,.form-grid,.delivery-grid{grid-template-columns:1fr}.item-list{max-height:none}}
+@media print{body{background:white}.hide-print,.card:first-child{display:none!important}main{max-width:100%;margin:0}.grid{display:block}.card{box-shadow:none;border:0;padding:0}.print-title{display:block;text-align:center;margin-bottom:18px}button{display:none}th,td{font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+  <div class="grid">
+    <section class="card hide-print">
+      <h2>Selecionar produtos</h2>
+      <div class="toolbar">
+        <input id="search" placeholder="Pesquisar produto..." oninput="renderItems()" />
+        <select id="filter" onchange="renderItems()">
+          <option value="todos">Todos os itens</option>
+          <option value="selecionados">Selecionados</option>
+          <option value="naoSelecionados">Não selecionados</option>
+        </select>
+      </div>
+      <div class="form-grid">
+        <div><label>Novo produto</label><input id="newProduct" placeholder="Ex.: Papel sulfite A4" /></div>
+        <div><label>Quantidade</label><input id="newQty" placeholder="Ex.: 02 Unidades" /></div>
+        <div><label>Categoria</label><select id="newCategory"><option>Geral</option><option>Limpeza</option><option>Copa/Cozinha</option><option>Higiene</option><option>Bebidas</option><option>Outros</option></select></div>
+        <button onclick="addNewItem()">Adicionar</button>
+      </div>
+      <div class="actions">
+        <button class="btn-light" onclick="selectAllVisible()">Selecionar visíveis</button>
+        <button class="btn-warning" onclick="clearSelection()">Limpar seleção</button>
+        <button class="btn-danger" onclick="resetSystem()">Resetar tudo</button>
+      </div>
+      <p class="status" id="status"></p>
+      <div class="item-list" id="itemList"></div>
+    </section>
+
+    <section class="card">
+      <div class="print-title"><h2>Lista de Compras Sicoob Lagoacred</h2></div>
+      <div class="hide-print delivery-grid">
+        <div>
+          <label>Data de entrega</label>
+          <input type="date" id="deliveryDate" oninput="saveState();renderSelected()" />
+        </div>
+        <div>
+          <label>Horário de entrega</label>
+          <select id="deliveryTime" onchange="saveState();renderSelected()">
+            <option value="Parte da manhã antes das 10:30">Parte da manhã antes das 10:30</option>
+            <option value="À tarde após as 15:30">À tarde após as 15:30</option>
+          </select>
+        </div>
+      </div>
+      <div id="deliveryPrint" class="print-info"></div>
+
+      <div class="section-title">Itens solicitados</div>
+      <table>
+        <thead><tr><th style="width:55%">Produto</th><th>Quantidade</th><th class="hide-print">Ação</th></tr></thead>
+        <tbody id="selectedTable"></tbody>
+      </table>
+
+      <div class="section-title">Dados para emissão da Nota Fiscal</div>
+      <div class="nf-box" id="nfData">
+        <b>COOPERATIVA DE CREDITO DE LIVRE ADMISSAO DE LAGOA DA PRATA E REGIAO LTDA</b><br>
+        CPF/CNPJ: 01.739.375/0001-30<br>
+        AV. BENEDITO VALADARES, 800 - LAGOA DA PRATA - CEP: 35590-028<br>
+        LAGOA DA PRATA/MG
+      </div>
+
+      <label class="hide-print" style="margin-top:14px">Observações da compra</label>
+      <textarea class="hide-print" id="notes" rows="3" placeholder="Ex.: priorizar reposição de café, leite e materiais de limpeza..." oninput="saveState();renderSelected()"></textarea>
+      <div id="notesPrint"></div>
+      <div class="actions hide-print">
+        <button onclick="window.print()">Gerar formulário / Salvar PDF</button>
+        <button class="btn-light" onclick="exportCSV()">Exportar CSV</button>
+        <button class="btn-light" onclick="copyList()">Copiar solicitação</button>
+        <button class="btn-light" onclick="exportFormImage()">Gerar imagem JPG</button>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+const baseItems = [{"produto":"Açucar","quantidade":"30 Kg"},{"produto":"Adoçante Zero Cal 100 ml","quantidade":""},{"produto":"Alcool em Gel(Neutro-Cristal)","quantidade":""},{"produto":"Alcool Líquido","quantidade":""},{"produto":"Azulin 1L","quantidade":""},{"produto":"Bom Ar - Exceto Lavanda","quantidade":""},{"produto":"Bucha de Cozinha (Esfrebom)","quantidade":"06 Unidades"},{"produto":"Café Barão Tradicional 500g","quantidade":"03 Caixas"},{"produto":"Cera Líquida Ingleza Incolor 1L","quantidade":""},{"produto":"Chá Mate 250g","quantidade":"04 Unidades"},{"produto":"Cloro 1l (IPÊ)","quantidade":"04 Unidades"},{"produto":"Desinfetante  2l (Lavanda)","quantidade":"04 Unidades"},{"produto":"Detergente Ype Clear (Transparente)","quantidade":"01 Caixa"},{"produto":"Ebulidor","quantidade":""},{"produto":"Filtro Utam","quantidade":"10 Unidades"},{"produto":"Guardanapo de Mesa Santepel","quantidade":"16 Unidades"},{"produto":"Leite Camponesa 1l Integral","quantidade":"30 Unidades"},{"produto":"Leite Camponesa 1l Desnatado","quantidade":""},{"produto":"Manteiga Retiro 500G","quantidade":"06 Unidades"},{"produto":"Manteiga Qualy 500G","quantidade":""},{"produto":"Manteiga Camponesa 500G","quantidade":""},{"produto":"Papel Higiênico 60Mts - Personal Vip com 12","quantidade":"10 unidades"},{"produto":"Papel Toalha Snob","quantidade":"05 Unidades"},{"produto":"Pinho Sol Limão - 500 ml","quantidade":"08 Unidades"},{"produto":"Rodo de Chão Pequeno","quantidade":""},{"produto":"Rodo Esfregão","quantidade":""},{"produto":"Sabão em Barras(Ipê) Azul","quantidade":""},{"produto":"Sabão em Pó Tixam 500g","quantidade":"03 Caixas"},{"produto":"Saco de Lixo para pia preto","quantidade":"08 Unidades"},{"produto":"Vassoura Macia","quantidade":""},{"produto":"Vassoura para Vaso Sanitário com Suporte","quantidade":""},{"produto":"Veja Lavanda (Roxo)","quantidade":"06 Unidades"},{"produto":"Bicarbonato de Sodio","quantidade":""},{"produto":"Eno 100g","quantidade":""},{"produto":"Sal 1Kg","quantidade":""},{"produto":"Saco de Lixo Poliluz 30L","quantidade":"08 Unidades"},{"produto":"Saco de Lixo Poliluz 50L","quantidade":"10 Unidades"},{"produto":"Saco de Lixo Poliluz 100L","quantidade":"08 Unidades"},{"produto":"Limpador Multiuso Cif Gel 475ml","quantidade":""},{"produto":"Toalha Mágica Panosul 35 Cm","quantidade":""},{"produto":"Desentupidor Diabo Verde","quantidade":""},{"produto":"Band-aid Caixa(40 unidades)","quantidade":""},{"produto":"Flanela (branca)","quantidade":""},{"produto":"Isqueiro","quantidade":""},{"produto":"Vinagre Branco","quantidade":""},{"produto":"Prendedor de Roupas","quantidade":""},{"produto":"Sabonete Liquido Hidraderm Neutro(Azul Claro) 1L","quantidade":""},{"produto":"Pano de Prato","quantidade":""},{"produto":"Copo de Alumínio Grande (2 Litros)","quantidade":""},{"produto":"Saco de Chão Grande(alvejado)","quantidade":""},{"produto":"Escova Dental","quantidade":"01 Unidade"},{"produto":"Balde Preto 12L","quantidade":""},{"produto":"Escova para lavar mamadeira","quantidade":""},{"produto":"Coca Cola 2L","quantidade":""},{"produto":"Fanta 2L","quantidade":""},{"produto":"Guarana Mineiro 2L","quantidade":""},{"produto":"Suco de Uva Del Valle 1L","quantidade":""},{"produto":"Pedra Sanitária","quantidade":""},{"produto":"Ralinho para Pia(médio)","quantidade":""},{"produto":"Fio Dental","quantidade":""},{"produto":"Creme Dental Colgate 90g","quantidade":""},{"produto":"Vassoura Piaçava","quantidade":""},{"produto":"Escova de Lavar Roupa","quantidade":""}];
+function categorize(p){p=p.toLowerCase();if(/alcool|azulin|cloro|desinfetante|detergente|cera|pinho|rodo|sabão|saco de lixo|vassoura|veja|bicarbonato|limpador|desentupidor|flanela|pano|balde|escova de lavar|pedra sanitária/.test(p))return 'Limpeza'; if(/açucar|adoçante|café|chá|leite|manteiga|sal|filtro|guardanapo|isqueiro|vinagre|copo|ralinho|bucha/.test(p))return 'Copa/Cozinha'; if(/papel higiênico|papel toalha|band-aid|sabonete|escova dental|fio dental|creme dental/.test(p))return 'Higiene'; if(/coca|fanta|guarana|suco/.test(p))return 'Bebidas'; return 'Geral'}
+function getBaseItems(){return baseItems.map((x,i)=>({id:'base_'+i, produto:x.produto, quantidade:x.quantidade, categoria:categorize(x.produto), selected:false, editing:false}))}
+let items;
+try { items = JSON.parse(localStorage.getItem('compras_items_layout_original_editavel') || 'null'); } catch(e) { items = null; }
+if (!Array.isArray(items) || items.length === 0) { items = getBaseItems(); }
+items = items.map((it,i)=>({id:it.id || 'item_'+i, produto:it.produto || '', quantidade:it.quantidade || '', categoria:it.categoria || categorize(it.produto || ''), selected:!!it.selected, editing:false}));
+const savedNotes = localStorage.getItem('compras_notes_layout_original_editavel') || ''; document.getElementById('notes').value = savedNotes;
+const savedDeliveryDate = localStorage.getItem('compras_delivery_date') || ''; document.getElementById('deliveryDate').value = savedDeliveryDate;
+const savedDeliveryTime = localStorage.getItem('compras_delivery_time') || 'Parte da manhã antes das 10:30'; document.getElementById('deliveryTime').value = savedDeliveryTime;
+function saveState(){localStorage.setItem('compras_items_layout_original_editavel', JSON.stringify(items.map(i=>({...i,editing:false})))); localStorage.setItem('compras_notes_layout_original_editavel', document.getElementById('notes').value); localStorage.setItem('compras_delivery_date', document.getElementById('deliveryDate').value); localStorage.setItem('compras_delivery_time', document.getElementById('deliveryTime').value)}
+function renderItems(){const q=document.getElementById('search').value.toLowerCase();const f=document.getElementById('filter').value;const box=document.getElementById('itemList');let visible=items.filter(it=>(it.produto+' '+it.categoria).toLowerCase().includes(q)); if(f==='selecionados') visible=visible.filter(it=>it.selected); if(f==='naoSelecionados') visible=visible.filter(it=>!it.selected); box.innerHTML=visible.map(it=>itemCard(it)).join('') || '<div class="empty">Nenhum item encontrado.</div>';document.getElementById('status').textContent=`Exibindo ${visible.length} de ${items.length} itens cadastrados.`;renderSelected()}
+function itemCard(it){return `<div class="item ${it.selected?'selected':''}"><div class="item-top"><input type="checkbox" ${it.selected?'checked':''} onchange="toggleItem('${it.id}',this.checked)"><div style="width:100%"><div class="item-title">${escapeHtml(it.produto)}</div><small>${escapeHtml(it.categoria||'Geral')}</small></div></div><div class="qty-row"><input value="${escapeHtml(it.quantidade||'')}" placeholder="Quantidade" onchange="updateField('${it.id}','quantidade',this.value)"><button class="btn-light mini" onclick="toggleItem('${it.id}',true)">Incluir</button></div>${it.editing?editBox(it):`<div class="edit-actions"><button class="btn-light mini" onclick="setEditing('${it.id}',true)">Editar item</button><button class="btn-danger mini" onclick="deleteItem('${it.id}')">Excluir</button></div>`}</div>`}
+function editBox(it){return `<div class="edit-grid"><input id="edit_prod_${it.id}" value="${escapeHtml(it.produto)}" placeholder="Nome do produto"><select id="edit_cat_${it.id}"><option ${it.categoria==='Geral'?'selected':''}>Geral</option><option ${it.categoria==='Limpeza'?'selected':''}>Limpeza</option><option ${it.categoria==='Copa/Cozinha'?'selected':''}>Copa/Cozinha</option><option ${it.categoria==='Higiene'?'selected':''}>Higiene</option><option ${it.categoria==='Bebidas'?'selected':''}>Bebidas</option><option ${it.categoria==='Outros'?'selected':''}>Outros</option></select><div class="edit-actions"><button class="mini" onclick="saveEdit('${it.id}')">Salvar</button><button class="btn-light mini" onclick="setEditing('${it.id}',false)">Cancelar</button></div></div>`}
+function renderSelected(){const selected=items.filter(it=>it.selected);const tbody=document.getElementById('selectedTable');tbody.innerHTML=selected.map(it=>`<tr><td>${escapeHtml(it.produto)}</td><td>${escapeHtml(it.quantidade||'-')}</td><td class="hide-print"><button class="btn-danger mini" onclick="toggleItem('${it.id}',false)">Remover</button></td></tr>`).join('') || '<tr><td colspan="3" class="empty">Nenhum item selecionado.</td></tr>';const notes=document.getElementById('notes').value.trim();document.getElementById('notesPrint').innerHTML=notes?`<p><b>Observações:</b> ${escapeHtml(notes)}</p>`:'';const d=document.getElementById('deliveryDate').value; const t=document.getElementById('deliveryTime').value; document.getElementById('deliveryPrint').innerHTML=`<p><b>Data de entrega:</b> ${escapeHtml(formatDateBR(d)||'-')}</p><p><b>Horário de entrega:</b> ${escapeHtml(t||'-')}</p>`;saveState()}
+function toggleItem(id,checked){const it=items.find(x=>x.id===id); if(it){it.selected=checked;saveState();renderItems()}}
+function updateField(id,field,val){const it=items.find(x=>x.id===id); if(it){it[field]=val;saveState();renderSelected()}}
+function setEditing(id,editing){items.forEach(i=>i.editing=false); const it=items.find(x=>x.id===id); if(it) it.editing=editing; renderItems()}
+function saveEdit(id){const it=items.find(x=>x.id===id); if(!it)return; const nome=document.getElementById('edit_prod_'+id).value.trim(); if(!nome){alert('Informe o nome do produto.');return} it.produto=nome; it.categoria=document.getElementById('edit_cat_'+id).value; it.editing=false; saveState(); renderItems()}
+function deleteItem(id){if(confirm('Deseja excluir este item da lista?')){items=items.filter(x=>x.id!==id);saveState();renderItems()}}
+function addNewItem(){const p=document.getElementById('newProduct').value.trim();const q=document.getElementById('newQty').value.trim();const c=document.getElementById('newCategory').value;if(!p){alert('Informe o nome do produto.');return}items.unshift({id:'new_'+Date.now(),produto:p,quantidade:q,categoria:c,selected:true,editing:false});document.getElementById('newProduct').value='';document.getElementById('newQty').value='';saveState();renderItems()}
+function selectAllVisible(){const q=document.getElementById('search').value.toLowerCase();items.forEach(it=>{if((it.produto+' '+it.categoria).toLowerCase().includes(q))it.selected=true});saveState();renderItems()}
+function clearSelection(){items.forEach(it=>it.selected=false);saveState();renderItems()}
+function resetSystem(){if(confirm('Deseja apagar seleções e itens adicionados, voltando à lista original?')){localStorage.removeItem('compras_items_layout_original_editavel');localStorage.removeItem('compras_notes_layout_original_editavel');localStorage.removeItem('compras_delivery_date');localStorage.removeItem('compras_delivery_time');location.reload()}}
+function exportCSV(){
+  const rows=[['Produto','Quantidade','Categoria'],...items.filter(i=>i.selected).map(i=>[i.produto,i.quantidade||'',i.categoria])];
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');
+  download('lista_compras.csv',csv,'text/csv;charset=utf-8;')
+}
+function copyList(){
+  const d=formatDateBR(document.getElementById('deliveryDate').value)||'-';
+  const t=document.getElementById('deliveryTime').value||'-';
+  const list=items.filter(i=>i.selected).map(i=>`- ${i.produto} | ${i.quantidade||'-'}`).join('\n');
+  const txt=`SOLICITAÇÃO DE COMPRAS PARA SUPERMERCADO\n\nData de entrega: ${d}\nHorário de entrega: ${t}\n\nItens solicitados:\n${list || 'Nenhum item selecionado.'}\n\nDados para emissão da Nota Fiscal:\nCOOPERATIVA DE CREDITO DE LIVRE ADMISSAO DE LAGOA DA PRATA E REGIAO LTDA\nCPF/CNPJ: 01.739.375/0001-30\nAV. BENEDITO VALADARES, 800 - LAGOA DA PRATA - CEP: 35590-028\nLAGOA DA PRATA/MG`;
+  navigator.clipboard.writeText(txt).then(()=>alert('Solicitação copiada.'))
+}
+
+
+function exportFormImage(){
+  const selected = items.filter(i => i.selected);
+  const deliveryDate = formatDateBR(document.getElementById('deliveryDate').value) || '-';
+  const deliveryTime = document.getElementById('deliveryTime').value || '-';
+  const notes = document.getElementById('notes').value.trim();
+
+  if(!selected.length){
+    alert('Selecione pelo menos um item para gerar a imagem JPG.');
+    return;
+  }
+
+  const scale = 2;
+  const width = 1000;
+  const margin = 44;
+  const line = 22;
+  const headerHeight = 96;
+  const infoHeight = 88;
+  const tableHeaderHeight = 38;
+  const rowHeight = 38;
+  const nfHeight = 122;
+  const notesHeight = notes ? 96 : 0;
+  const height = margin + headerHeight + infoHeight + 44 + tableHeaderHeight + (selected.length * rowHeight) + 42 + nfHeight + notesHeight + margin;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+
+  function roundRect(x, y, w, h, r){
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y);
+    ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+    ctx.lineTo(x+w, y+h-r);
+    ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+    ctx.lineTo(x+r, y+h);
+    ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+    ctx.lineTo(x, y+r);
+    ctx.quadraticCurveTo(x, y, x+r, y);
+    ctx.closePath();
+  }
+  function fillTextWrap(text, x, y, maxWidth, lineHeight){
+    const words = String(text || '').split(/\s+/);
+    let lineText = '';
+    let currentY = y;
+    for(const word of words){
+      const test = lineText ? lineText + ' ' + word : word;
+      if(ctx.measureText(test).width > maxWidth && lineText){
+        ctx.fillText(lineText, x, currentY);
+        lineText = word;
+        currentY += lineHeight;
+      }else{
+        lineText = test;
+      }
+    }
+    if(lineText) ctx.fillText(lineText, x, currentY);
+    return currentY + lineHeight;
+  }
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = '#d0d5dd';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(12, 12, width - 24, height - 24);
+
+  let y = margin;
+  ctx.fillStyle = '#006b4f';
+  ctx.font = 'bold 28px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Lista de Compras Sicoob Lagoacred', width / 2, y + 30);
+  ctx.fillStyle = '#667085';
+  ctx.font = '14px Arial';
+  ctx.fillText('', width / 2, y + 56);
+  ctx.strokeStyle = '#006b4f';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(margin, y + 78);
+  ctx.lineTo(width - margin, y + 78);
+  ctx.stroke();
+  y += headerHeight;
+
+  const boxW = (width - margin*2 - 16) / 2;
+  ctx.textAlign = 'left';
+  ctx.lineWidth = 1;
+  [{label:'Data de entrega', value:deliveryDate, x:margin}, {label:'Horário de entrega', value:deliveryTime, x:margin+boxW+16}].forEach(box => {
+    ctx.fillStyle = '#f9fafb';
+    roundRect(box.x, y, boxW, 68, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#d0d5dd';
+    ctx.stroke();
+    ctx.fillStyle = '#667085';
+    ctx.font = '13px Arial';
+    ctx.fillText(box.label, box.x + 14, y + 22);
+    ctx.fillStyle = '#1d2939';
+    ctx.font = 'bold 16px Arial';
+    fillTextWrap(box.value, box.x + 14, y + 47, boxW - 28, 18);
+  });
+  y += infoHeight;
+
+  ctx.fillStyle = '#344054';
+  ctx.font = 'bold 17px Arial';
+  ctx.fillText('Itens solicitados', margin, y);
+  y += 12;
+
+  const tableX = margin;
+  const tableW = width - margin*2;
+  const col1 = 58;
+  const col3 = 200;
+  const col2 = tableW - col1 - col3;
+
+  ctx.fillStyle = '#eef7f3';
+  ctx.fillRect(tableX, y, tableW, tableHeaderHeight);
+  ctx.strokeStyle = '#d0d5dd';
+  ctx.strokeRect(tableX, y, tableW, tableHeaderHeight);
+  ctx.fillStyle = '#1d2939';
+  ctx.font = 'bold 14px Arial';
+  ctx.fillText('Nº', tableX + 18, y + 24);
+  ctx.fillText('Produto', tableX + col1 + 12, y + 24);
+  ctx.fillText('Quantidade', tableX + col1 + col2 + 12, y + 24);
+  ctx.beginPath();
+  ctx.moveTo(tableX + col1, y); ctx.lineTo(tableX + col1, y + tableHeaderHeight);
+  ctx.moveTo(tableX + col1 + col2, y); ctx.lineTo(tableX + col1 + col2, y + tableHeaderHeight);
+  ctx.stroke();
+  y += tableHeaderHeight;
+
+  ctx.font = '14px Arial';
+  selected.forEach((it, idx) => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(tableX, y, tableW, rowHeight);
+    ctx.strokeStyle = '#d0d5dd';
+    ctx.strokeRect(tableX, y, tableW, rowHeight);
+    ctx.beginPath();
+    ctx.moveTo(tableX + col1, y); ctx.lineTo(tableX + col1, y + rowHeight);
+    ctx.moveTo(tableX + col1 + col2, y); ctx.lineTo(tableX + col1 + col2, y + rowHeight);
+    ctx.stroke();
+    ctx.fillStyle = '#1d2939';
+    ctx.fillText(String(idx + 1), tableX + 22, y + 24);
+    fillTextWrap(it.produto, tableX + col1 + 12, y + 24, col2 - 24, 16);
+    fillTextWrap(it.quantidade || '-', tableX + col1 + col2 + 12, y + 24, col3 - 24, 16);
+    y += rowHeight;
+  });
+  y += 34;
+
+  ctx.fillStyle = '#344054';
+  ctx.font = 'bold 17px Arial';
+  ctx.fillText('Dados para emissão da Nota Fiscal', margin, y);
+  y += 12;
+
+  ctx.fillStyle = '#f9fafb';
+  roundRect(margin, y, width - margin*2, nfHeight - 18, 10);
+  ctx.fill();
+  ctx.strokeStyle = '#d0d5dd';
+  ctx.stroke();
+  ctx.fillStyle = '#1d2939';
+  ctx.font = 'bold 14px Arial';
+  ctx.fillText('COOPERATIVA DE CREDITO DE LIVRE ADMISSAO DE LAGOA DA PRATA E REGIAO LTDA', margin + 14, y + 25);
+  ctx.font = '14px Arial';
+  ctx.fillText('CPF/CNPJ: 01.739.375/0001-30', margin + 14, y + 50);
+  ctx.fillText('AV. BENEDITO VALADARES, 800 - LAGOA DA PRATA - CEP: 35590-028', margin + 14, y + 75);
+  ctx.fillText('LAGOA DA PRATA/MG', margin + 14, y + 100);
+  y += nfHeight;
+
+  if(notes){
+    ctx.fillStyle = '#344054';
+    ctx.font = 'bold 17px Arial';
+    ctx.fillText('Observações', margin, y);
+    y += 12;
+    ctx.fillStyle = '#ffffff';
+    roundRect(margin, y, width - margin*2, 66, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#d0d5dd';
+    ctx.stroke();
+    ctx.fillStyle = '#1d2939';
+    ctx.font = '14px Arial';
+    fillTextWrap(notes, margin + 14, y + 25, width - margin*2 - 28, line);
+  }
+
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/jpeg', 0.95);
+  a.download = `Solicitacao_Compras_${new Date().toISOString().slice(0,10)}.jpg`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function download(name,content,type){const blob=new Blob(['﻿'+content],{type});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
+function formatDateBR(dateStr){if(!dateStr)return ''; const [y,m,d]=dateStr.split('-'); return `${d}/${m}/${y}`}
+function escapeHtml(s){return String(s||'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
+renderItems();
+</script>
+</body>
+</html>
